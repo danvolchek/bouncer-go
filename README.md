@@ -24,7 +24,55 @@ It's mostly framework stuff so far.
 Download the latest version of Go. On Arch: `sudo pacman -S go`.
 
 The program takes in a config directory and expects there to be a `bouncer.db` and a `config.json` file inside of them.
-The config file is the same as bouncer's.
+
+The config file is similar to bouncer's except:
+ - All ids are strings instead of numbers because discord-go uses strings for ids rather than numbers like discordpy
+ - The `owner` user id field is moved into the `roles` config named `owner` (list of role ids)
+ - The `DM` configs are booleans rather than numbers
+ - The `rolesToAddToThreads` field was moved under `roles` named `dm_threads` and it's parent `messageForwarding` removed
+ - The `debug` field isn't used
+
+Sample `config.json` file (see [config.go](lib/config.go) for meaning):
+```json
+{
+  "discord": "xxxxxx",
+  "command_prefix": "$",
+  "servers": {
+    "home": "12345678910"
+  },
+  "categories": {
+    "listening": [
+      "12345678910"
+    ]
+  },
+  "channels": {
+    "mailbox": "12345678910",
+    "spam": "12345678910",
+    "ignore_spam": [],
+    "log": "12345678910",
+    "syslog": "12345678910",
+    "watchlist": "12345678910",
+    "ban_appeal": "12345678910"
+  },
+  "roles": {
+    "admin": [
+      "12345678910"
+    ],
+    "owner": [
+      "12345678910"
+    ],
+    "dm_thread": [
+      "12345678910"
+    ]
+  },
+  "DM":{
+    "ban": true,
+    "warn": true
+  }
+}
+```
+
+The database file is identical to bouncer's.
 
 Then, one of:
  - Rebuild every time: `go run main.go -config private/ -debug`

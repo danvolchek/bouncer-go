@@ -166,7 +166,7 @@ func (c *CommandHandler) shouldIgnoreMessage(message *discordgo.Message, log zer
 			return true
 		}
 
-		if !slices.ContainsFunc(c.Config.Roles.AdminRoles, func(adminRole string) bool {
+		if !slices.ContainsFunc(c.Config.Roles.Admin, func(adminRole string) bool {
 			return slices.Contains(user.Roles, adminRole)
 		}) {
 			log.Debug().Str("user", message.Author.Username).Msg("ignoring message from non-admin user")
