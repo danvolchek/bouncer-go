@@ -2,7 +2,7 @@
   <configuration default="false" name="Run" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="bouncer-go" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="-debug -config=&quot;private/config.json&quot;" />
+    <parameters value="-debug -config=private/" />
     <kind value="PACKAGE" />
     <package value="github.com/danvolchek/bouncer-go" />
     <directory value="$PROJECT_DIR$" />

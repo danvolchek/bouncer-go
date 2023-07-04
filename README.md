@@ -23,13 +23,13 @@ It's mostly framework stuff so far.
 
 Download the latest version of Go. On Arch: `sudo pacman -S go`.
 
-The config file is the same as bouncer's, except it has an extra top level field `"database_path"` which should point to
-your database file.
+The program takes in a config directory and expects there to be a `bouncer.db` and a `config.json` file inside of them.
+The config file is the same as bouncer's.
 
 Then, one of:
- - rebuild every time: `go run main.go -config private/bouncer.db -debug`
- - build once, run multiple times: `go build -o bouncer main.go && ./bouncer -config private/bouncer.db -debug`
- - in IntelliJ IDE: run the `Run` run configuration. Config path is expected to be `private/bouncer.db`.
+ - Rebuild every time: `go run main.go -config private/ -debug`
+ - Build once, run multiple times: `go build -o bouncer main.go && ./bouncer -config private/ -debug`
+ - In IntelliJ IDE: run the `Run` run configuration. Configs are expected to be in `private/`.
 
 # Development
 

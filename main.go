@@ -10,11 +10,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
+	"path/filepath"
 	"time"
 )
 
 func main() {
-	configPath := flag.String("config", "", "path to config file (required)")
+	configPath := flag.String("config", "", "path to config directory (required)")
 	debug := flag.Bool("debug", false, "sets log level to debug")
 	trace := flag.Bool("trace", false, "sets log level to trace")
 
@@ -48,7 +49,8 @@ func main() {
 	// Load config
 	var config *lib.Config
 	{
-		data, err := os.ReadFile(*configPath)
+		configFile := filepath.Join(*configPath, "config.json")
+		data, err := os.ReadFile(configFile)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to read config file")
 		}
@@ -59,8 +61,9 @@ func main() {
 		}
 	}
 
+	dbFile := filepath.Join(*configPath, "bouncer.db")
 	// Initialize database
-	db, err := database.New(config.DatabasePath)
+	db, err := database.New(dbFile)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create database")
 	}
