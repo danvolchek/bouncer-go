@@ -121,9 +121,15 @@ Then, one of:
 ## Adding new database fields
 - Update `tables.go` as well as `database.allTables`
 
-# Thoughts on the port
+## Docs
+- Discordgo: https://github.com/bwmarrin/discordgo, https://pkg.go.dev/github.com/bwmarrin/discordgo
+- Zerolog: https://github.com/rs/zerolog
+- Other Go libraries: https://github.com/eleven26/awesome-go-stars
+- Slices: https://pkg.go.dev/golang.org/x/exp/slices
+- Discordpy: https://discordpy.readthedocs.io/en/latest/api.html
 
-- discord-go is lower level, so more API calls are needed for tasks that discordpy would handle automatically
+# Thoughts on the port
+- discordgo is lower level, so more API calls are needed for tasks that discordpy would handle automatically
   - e.g. retrieving the roles a user has, or the category a channel is in
 - everything being typed is already so much nicer than discord-py
 
