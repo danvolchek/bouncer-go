@@ -13,6 +13,36 @@ It's mostly framework stuff so far.
 - Add commands
 - Interact with database
 
+## Commands
+
+| Command     | Implemented |
+|-------------|-------------|
+| `ban`       | ❌           |
+| `block`     | ❌           |
+| `clear`     | ❌           |
+| `edit`      | ❌           |
+| `graph`     | ❌           |
+| `help`      | ✅           |
+| `kick`      | ❌           |
+| `note`      | ❌           |
+| `preview`   | ❌           |
+| `remove`    | ❌           |
+| `reply`     | ❌           |
+| `say`       | ❌           |
+| `scam`      | ❌           |
+| `search`    | ❌           |
+| `sync`      | ❌           |
+| `unban`     | ❌           |
+| `unblock`   | ❌           |
+| `uptime`    | ❌           |
+| `waiting`   | ❌           |
+| `warn`      | ❌           |
+| `watch`     | ❌           |
+| `watchlist` | ❌           |
+| `unmute`    | ❌           |
+| `unwatch`   | ❌           |
+
+
 # Feature to be added
 
 - Implementing all the commands

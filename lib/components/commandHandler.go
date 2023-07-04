@@ -28,6 +28,9 @@ type Command interface {
 	// Name should return the name of the command, case-sensitive.
 	Name() string
 
+	// Setup is called before the bot is started, after configs/the db is loaded. Perform initial setup here.
+	Setup(utils *lib.Utils)
+
 	// Handle should perform the action the command does.
 	// It should return a boolean indicating whether the command succeeded - if not the handler will reply with a
 	// UUID to look up the logs. The command should log anything relevant, including errors that happen.
@@ -77,6 +80,10 @@ func NewCommandHandler(commands []Command) (*CommandHandler, error) {
 func (c *CommandHandler) Setup(utils *lib.Utils) {
 	c.Utils = utils
 
+	for name, command := range c.commands {
+		command.Setup(c.createCommandUtils(c.Log, name))
+	}
+
 	c.Discord.AddHandler(c.handleCommand)
 }
 
@@ -111,14 +118,8 @@ func (c *CommandHandler) handleCommand(_ *discordgo.Session, messageCreate *disc
 		return
 	}
 
-	// Now that the command is parsed, add the command and args to logs
-	log = log.With().
-		Str("command", commandDetails.ShortString()).
-		Logger()
-
-	utils := &(*c.Utils)
-	utils.Log = log
-	utils.DB = database.WithLogger(utils.DB, log)
+	// From here on, use the command utils logger which has the command in it
+	commandUtils := c.createCommandUtils(log, commandDetails.ShortString())
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -126,9 +127,9 @@ func (c *CommandHandler) handleCommand(_ *discordgo.Session, messageCreate *disc
 		}
 	}()
 
-	ok = command.Handle(commandDetails, message, utils)
+	ok = command.Handle(commandDetails, message, commandUtils)
 	if !ok {
-		log.Warn().Msg("command failed")
+		commandUtils.Log.Warn().Msg("command failed")
 		sendUUID()
 	}
 }
@@ -211,4 +212,18 @@ func (c *CommandHandler) parseCommand(message *discordgo.Message) (*CommandDetai
 		Name: commandName,
 		Args: commandArgs,
 	}, nil
+}
+
+// createCommandUtils creates a utils struct for a command. This is the same as the handler's utils, except the
+// loggers are configured with extra command information.
+func (c *CommandHandler) createCommandUtils(log zerolog.Logger, command string) *lib.Utils {
+	log = log.With().
+		Str("command", command).
+		Logger()
+
+	utils := &(*c.Utils)
+	utils.Log = log
+	utils.DB = database.WithLogger(utils.DB, log)
+
+	return utils
 }

@@ -4,4 +4,4 @@ import (
 	"github.com/danvolchek/bouncer-go/lib/components"
 )
 
-var All = []components.Command{help{}}
+var All = []components.Command{&help{}}
