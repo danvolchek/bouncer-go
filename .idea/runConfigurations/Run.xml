@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="bouncer-go" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="-debug -config=&quot;private/config.json&quot;" />
+    <kind value="PACKAGE" />
+    <package value="github.com/danvolchek/bouncer-go" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/main.go" />
+    <method v="2" />
+  </configuration>
+</component>
