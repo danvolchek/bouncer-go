@@ -221,9 +221,9 @@ func (c *CommandHandler) createCommandUtils(log zerolog.Logger, command string) 
 		Str("command", command).
 		Logger()
 
-	utils := &(*c.Utils)
+	utils := *c.Utils
 	utils.Log = log
 	utils.DB = database.WithLogger(utils.DB, log)
 
-	return utils
+	return &utils
 }
