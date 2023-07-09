@@ -29,6 +29,7 @@ type Command interface {
 	Name() string
 
 	// Setup is called before the bot is started, after configs/the db is loaded. Perform initial setup here.
+	// Don't save the utils class.
 	Setup(utils *lib.Utils)
 
 	// Handle should perform the action the command does.
@@ -54,7 +55,7 @@ func (c CommandDetails) ShortString() string {
 
 	str := c.Name + " " + strings.Join(c.Args, " ")
 	if len(str) > 30 {
-		str = str[0:30]
+		str = str[0:27] + "..."
 	}
 
 	return str

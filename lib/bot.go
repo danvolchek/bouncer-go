@@ -22,6 +22,8 @@ type Bot struct {
 // Component is the interface that bot components should implement.
 type Component interface {
 	// Setup is called before the bot is started. Register any hooks/perform any initial setup here.
+	// The config/db are ready here, but while the discord client has been created it hasn't connected to discord yet,
+	// so do not make discord API calls.
 	Setup(utils *Utils)
 }
 
