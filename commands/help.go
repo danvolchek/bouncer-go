@@ -57,9 +57,15 @@ func (h *help) Setup(utils *lib.Utils) {
 func (h *help) Name() string {
 	return "help"
 }
+func (h *help) RequiresUser() bool {
+	return true
+}
 
 func (h *help) Handle(command *components.CommandDetails, message *discordgo.Message, utils *lib.Utils) bool {
-	utils.Reply(message, h.replacer.Replace(helpMessageTemplate))
+	//utils.Reply(message, h.replacer.Replace(helpMessageTemplate))
+	utils.Log.Info().Msgf("%+v", command)
+
+	utils.Log.Info().Msg("Oh no, the sun exploded!")
 
 	return true
 }

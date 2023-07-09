@@ -8,6 +8,7 @@ import (
 	uuid2 "github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/slices"
+	"regexp"
 	"strings"
 )
 
@@ -30,6 +31,10 @@ type Command interface {
 	// Name should return the name of the command, case-sensitive.
 	Name() string
 
+	// RequiresUser should return whether the command requires a user argument. If true and not provided, the handler
+	// will reply with an error.
+	RequiresUser() bool
+
 	// Setup is called before the bot is started, after configs/the db is loaded. Perform initial setup here.
 	// Don't save the utils class.
 	Setup(utils *lib.Utils)
@@ -48,6 +53,9 @@ type CommandDetails struct {
 
 	// Args is the command arguments.
 	Args []string
+
+	// User is first user reference in the command. Will be nil if there are none.
+	User *discordgo.User
 }
 
 func (c CommandDetails) ShortString() string {
@@ -124,6 +132,17 @@ func (c *CommandHandler) handleCommand(_ *discordgo.Session, messageCreate *disc
 	// From here on, use the command utils logger which has the command in it
 	commandUtils := c.createCommandUtils(log, commandDetails.ShortString())
 
+	if command.RequiresUser() {
+		user, err := c.getUserMention(commandUtils.Log, commandDetails, message.GuildID)
+		if err != nil {
+			c.Reply(message, err.Error())
+			return
+		}
+
+		commandDetails.Args = commandDetails.Args[1:]
+		commandDetails.User = user
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			sendUUID()
@@ -147,7 +166,7 @@ func (c *CommandHandler) shouldIgnoreMessage(message *discordgo.Message, log zer
 
 	// Ignore messages in non-enabled channels
 	{
-		channel, err := c.Discord.Channel(message.ChannelID)
+		channel, err := c.Discord.State.Channel(message.ChannelID)
 		if err != nil {
 			log.Error().Err(err).Msg("ignoring message - failed to retrieve channel info")
 			return true
@@ -215,6 +234,41 @@ func (c *CommandHandler) parseCommand(message *discordgo.Message) (*CommandDetai
 		Name: commandName,
 		Args: commandArgs,
 	}, nil
+}
+
+var userPingRegexp = regexp.MustCompile(`<@(\d+)>`)
+
+func (c *CommandHandler) getUserMention(log zerolog.Logger, command *CommandDetails, guildId string) (*discordgo.User, error) {
+	if len(command.Args) == 0 {
+		return nil, fmt.Errorf("This command requires a user, see %shelp.", c.Utils.Config.Prefix)
+	}
+
+	userRef := command.Args[0]
+
+	if match := userPingRegexp.FindStringSubmatch(userRef); match != nil {
+		userRef = match[1]
+	}
+
+	// first try getting the user from their id directly, or a mention
+	user, errId := c.UserFromId(userRef)
+	if errId == nil {
+		return user, nil
+	}
+
+	// next try getting the user from a name
+	user, errName := c.UserFromName(userRef, guildId)
+	if errName == nil {
+		return user, nil
+	}
+
+	log.Warn().
+		Str("input", userRef).
+		Str("errId", errId.Error()).
+		Str("errName", errName.Error()).
+		Msg("couldn't find user")
+
+	// otherwise return an error
+	return nil, fmt.Errorf("Couldn't find user '%s'.", command.Args[0])
 }
 
 // createCommandUtils creates a utils struct for a command. This is the same as the handler's utils, except the
