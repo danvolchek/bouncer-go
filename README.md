@@ -53,6 +53,8 @@ It's mostly framework stuff so far.
 
 Download the latest version of Go. On Arch: `sudo pacman -S go`.
 
+Also get [task](https://taskfile.dev/), an alternative to make. On Arch: `yay -S go-task-bin`. I use `alias task="go-task"`.
+
 The program takes in a config directory and expects there to be a `bouncer.db` and a `config.json` file inside of them.
 
 The config file is similar to bouncer's except:
@@ -105,11 +107,17 @@ Sample `config.json` file (see [config.go](lib/config.go) for meaning):
 The database file is identical to bouncer's.
 
 Then, one of:
- - Rebuild every time: `go run main.go -config private/ -debug`
- - Build once, run multiple times: `go build -o bouncer main.go && ./bouncer -config private/ -debug`
+ - CLI: `task run`
  - In IntelliJ IDE: run the `Run` run configuration. Configs are expected to be in `private/`.
 
+To just build the binary, run `task build`.
+
+If you want to run the go commands directly, see [taskfile.yml](taskfile.yml).
+
 # Development
+
+## Setting up unit tests
+Run `task generate` to generate the mocks. These aren't committed.
 
 ## Adding commands
 - Add a file in the commands folder with a struct that implements the `Command` interface
@@ -124,9 +132,11 @@ Then, one of:
 ## Docs
 - Discordgo: https://github.com/bwmarrin/discordgo, https://pkg.go.dev/github.com/bwmarrin/discordgo
 - Zerolog: https://github.com/rs/zerolog
+- Gomock: https://github.com/uber/mock
 - Other Go libraries: https://github.com/eleven26/awesome-go-stars
 - Slices: https://pkg.go.dev/golang.org/x/exp/slices
 - Discordpy: https://discordpy.readthedocs.io/en/latest/api.html
+- Taskfile: https://taskfile.dev/
 
 # Thoughts on the port
 - discordgo is lower level, so more API calls are needed for tasks that discordpy would handle automatically

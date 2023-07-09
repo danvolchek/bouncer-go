@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+//go:generate mockgen -typed -destination mocks/mock_command.go . Command
+
 // CommandHandler is a component responsible for handling commands for the bot - i.e. messages that begin with the command prefix.
 // The handler is a generic orchestrator capable of executing any command - it handles common stuff like making sure a command
 // is being sent in the first place, the user has the authority to send the command, parsing the command text, etc.

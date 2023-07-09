@@ -1,0 +1,24 @@
+version: '3'
+
+tasks:
+  generate:
+    cmds:
+      - go generate ./...
+    sources:
+      - '**/*.go'
+
+  build:
+    deps:
+      - generate
+    cmds:
+      - go build -o bouncer main.go
+    sources:
+      - '**/*.go'
+    generates:
+      - bouncer
+
+  run:
+    deps:
+      - build
+    cmds:
+      - ./bouncer -config private/ -debug
