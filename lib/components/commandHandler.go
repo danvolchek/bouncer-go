@@ -133,9 +133,9 @@ func (c *CommandHandler) handleCommand(_ *discordgo.Session, messageCreate *disc
 	commandUtils := c.createCommandUtils(log, commandDetails.ShortString())
 
 	if command.RequiresUser() {
-		user, err := c.getUserMention(commandUtils.Log, commandDetails, message.GuildID)
+		user, err := c.getUserMention(commandDetails, message.GuildID, commandUtils.Log)
 		if err != nil {
-			c.Reply(message, err.Error())
+			c.Reply(message, fmt.Sprintf("Invalid user: %s.", err.Error()))
 			return
 		}
 
@@ -238,9 +238,9 @@ func (c *CommandHandler) parseCommand(message *discordgo.Message) (*CommandDetai
 
 var userPingRegexp = regexp.MustCompile(`<@(\d+)>`)
 
-func (c *CommandHandler) getUserMention(log zerolog.Logger, command *CommandDetails, guildId string) (*discordgo.User, error) {
+func (c *CommandHandler) getUserMention(command *CommandDetails, guildId string, log zerolog.Logger) (*discordgo.User, error) {
 	if len(command.Args) == 0 {
-		return nil, fmt.Errorf("This command requires a user, see %shelp.", c.Utils.Config.Prefix)
+		return nil, fmt.Errorf("this command requires a user, see %shelp", c.Utils.Config.Prefix)
 	}
 
 	userRef := command.Args[0]
@@ -261,14 +261,14 @@ func (c *CommandHandler) getUserMention(log zerolog.Logger, command *CommandDeta
 		return user, nil
 	}
 
-	log.Warn().
+	log.Debug().
 		Str("input", userRef).
 		Str("errId", errId.Error()).
 		Str("errName", errName.Error()).
 		Msg("couldn't find user")
 
 	// otherwise return an error
-	return nil, fmt.Errorf("Couldn't find user '%s'.", command.Args[0])
+	return nil, fmt.Errorf("couldn't find a user with id or name `%s`", command.Args[0])
 }
 
 // createCommandUtils creates a utils struct for a command. This is the same as the handler's utils, except the
