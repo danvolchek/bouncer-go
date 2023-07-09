@@ -107,7 +107,7 @@ Sample `config.json` file (see [config.go](lib/config.go) for meaning):
 The database file is identical to bouncer's.
 
 Then, one of:
- - CLI: `task run`
+ - CLI: `task run`. Configs are taken from `private/` by default, change them using `CONFIG=foo/ task run`.
  - In IntelliJ IDE: run the `Run` run configuration. Configs are expected to be in `private/`.
 
 To just build the binary, run `task build`.

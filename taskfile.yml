@@ -2,12 +2,14 @@ version: '3'
 
 tasks:
   generate:
+    desc: Generate files necessary for build.
     cmds:
       - go generate ./...
     sources:
       - '**/*.go'
 
   build:
+    desc: Build the bouncer executable.
     deps:
       - generate
     cmds:
@@ -18,7 +20,8 @@ tasks:
       - bouncer
 
   run:
+    desc: Run bouncer in debug mode using configs in private/. Set CONFIG to use a different directory.
     deps:
       - build
     cmds:
-      - ./bouncer -config private/ -debug
+      - ./bouncer -config {{.CONFIG | default "private/"}} -debug
