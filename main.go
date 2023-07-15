@@ -71,19 +71,19 @@ func main() {
 	// create components
 	var comps []lib.Component
 	{
-		commandHandler, err := components.NewCommandHandler(commands.All)
+		commandHandler, err := components.NewCommands(commands.All)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create command handler")
 		}
 
-		readyLogger := components.NewReadyLogger()
+		readyLogger := components.NewReady()
 
 		comps = []lib.Component{commandHandler, readyLogger}
 	}
 
 	// create and run bot
 	{
-		bot := lib.NewBot(comps, config, db)
+		bot := lib.NewBot(comps, config, db, log.Logger)
 
 		err = bot.Run()
 		if err != nil {

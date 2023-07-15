@@ -1,12 +1,11 @@
 package components
 
 import (
+	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"github.com/danvolchek/bouncer-go/database"
 	"github.com/danvolchek/bouncer-go/lib"
 	uuid2 "github.com/google/uuid"
-	"github.com/rs/zerolog"
 	"golang.org/x/exp/slices"
 	"regexp"
 	"strings"
@@ -14,11 +13,11 @@ import (
 
 //go:generate mockgen -typed -destination mocks/mock_command.go . Command
 
-// CommandHandler is a component responsible for handling commands for the bot - i.e. messages that begin with the command prefix.
+// Commands is a component responsible for handling commands for the bot - i.e. messages that begin with the command prefix.
 // The handler is a generic orchestrator capable of executing any command - it handles common stuff like making sure a command
 // is being sent in the first place, the user has the authority to send the command, parsing the command text, etc.
 // Commands themselves should implement the Command interface and be passed when creating the handler.
-type CommandHandler struct {
+type Commands struct {
 	// map from command name to command, for easy access
 	commands map[string]Command
 
@@ -71,8 +70,8 @@ func (c CommandDetails) ShortString() string {
 	return str
 }
 
-// NewCommandHandler creates a command handler that runs the provided commands.
-func NewCommandHandler(commands []Command) (*CommandHandler, error) {
+// NewCommands creates a command handler that runs the provided commands.
+func NewCommands(commands []Command) (*Commands, error) {
 	var commandMap = make(map[string]Command, len(commands))
 
 	for _, command := range commands {
@@ -84,98 +83,114 @@ func NewCommandHandler(commands []Command) (*CommandHandler, error) {
 		commandMap[name] = command
 	}
 
-	return &CommandHandler{commands: commandMap}, nil
+	return &Commands{commands: commandMap}, nil
 }
 
 // Setup is called before the bot is started. Register any hooks/perform any initial setup here.
-func (c *CommandHandler) Setup(utils *lib.Utils) {
+func (c *Commands) Setup(utils *lib.Utils) {
 	c.Utils = utils
 
 	for name, command := range c.commands {
-		command.Setup(c.createCommandUtils(c.Log, name))
+		command.Setup(c.NewWithLog(lib.AddString("command", name)))
 	}
 
 	c.Discord.AddHandler(c.handleCommand)
 }
 
 // handleCommand is called on every new message being sent and runs the appropriate command based on the message text.
-func (c *CommandHandler) handleCommand(_ *discordgo.Session, messageCreate *discordgo.MessageCreate) {
+func (c *Commands) handleCommand(_ *discordgo.Session, messageCreate *discordgo.MessageCreate) {
 	// Add uuid to logs about this command execution for easier debugging
 	uuid := uuid2.New().String()
-	log := c.Log.With().Str("uuid", uuid).Logger()
 
-	message := messageCreate.Message
+	invoker := commandInvoker{
+		uuid:    uuid,
+		message: messageCreate.Message,
+		Utils:   c.Utils.NewWithLog(lib.AddString("uuid", uuid)),
+	}
 
+	invoker.invoke()
+}
+
+type commandInvoker struct {
+	uuid     string
+	message  *discordgo.Message
+	commands map[string]Command
+	*lib.Utils
+}
+
+func (c commandInvoker) invoke() {
 	// Check if this message should be ignored or not - is the user an admin, in the right channel, etc
-	if c.shouldIgnoreMessage(message, log) {
+	if c.shouldIgnoreMessage() {
 		return
 	}
 
-	// From here on, provide more error details to the user because they're an admin
-	sendUUID := func() {
-		c.Reply(message, fmt.Sprintf("Oops, something went wrong handling that message. Check the logs for `%s`.", uuid))
+	if c.Log.Debug().Enabled() {
+		c.sendUUID(false)
 	}
 
-	commandDetails, err := c.parseCommand(message)
+	commandDetails, err := c.parseCommand()
 	if err != nil {
-		log.Error().Err(err).Msg("failed to parse message")
-		sendUUID()
+		c.Log.Error().Err(err).Msg("failed to parse message")
+		c.sendUUID(true)
 		return
 	}
 
 	command, ok := c.commands[commandDetails.Name]
 	if !ok {
-		c.Reply(message, fmt.Sprintf("Unknown command `%s` - see `%shelp`", commandDetails.Name, c.Config.Prefix))
+		c.Reply(c.message, fmt.Sprintf("Unknown command `%s` - see `%shelp`", commandDetails.Name, c.Config.Prefix))
 		return
 	}
 
-	// From here on, use the command utils logger which has the command in it
-	commandUtils := c.createCommandUtils(log, commandDetails.ShortString())
+	c.Utils = c.NewWithLog(lib.AddString("command", commandDetails.ShortString()))
 
 	if command.RequiresUser() {
-		user, err := c.getUserMention(commandDetails, message.GuildID, commandUtils.Log)
+		err := c.setUser(commandDetails)
 		if err != nil {
-			c.Reply(message, fmt.Sprintf("Invalid user: %s.", err.Error()))
-			return
 		}
-
-		commandDetails.Args = commandDetails.Args[1:]
-		commandDetails.User = user
 	}
 
 	defer func() {
 		if r := recover(); r != nil {
-			sendUUID()
+			c.Log.Error().Any("panic", r).Msg("command panicked")
+			c.sendUUID(true)
 		}
 	}()
 
-	ok = command.Handle(commandDetails, message, commandUtils)
+	ok = command.Handle(commandDetails, c.message, c.Utils)
 	if !ok {
-		commandUtils.Log.Warn().Msg("command failed")
-		sendUUID()
+		c.Log.Warn().Msg("command failed")
+		c.sendUUID(true)
+	}
+}
+
+func (c commandInvoker) sendUUID(wasError bool) {
+	if wasError {
+		c.Reply(c.message, fmt.Sprintf("UUID for logs is `%s`.", c.uuid))
+	} else {
+		c.Reply(c.message, fmt.Sprintf("Oops, something went wrong handling that message. Check the logs for `%s`.", c.uuid))
 	}
 }
 
 // shouldIgnoreMessage returns whether the message that was sent should be ignored
 // any errors should be logged but not sent to the user who sent the message because that user may not be an admin
-func (c *CommandHandler) shouldIgnoreMessage(message *discordgo.Message, log zerolog.Logger) bool {
+func (c commandInvoker) shouldIgnoreMessage() bool {
 	// Ignore messages sent by this user or other bots
-	if message.Author.ID == c.Discord.State.User.ID || message.Author.Bot {
+	if c.message.Author.ID == c.Discord.State.User.ID || c.message.Author.Bot {
 		return true
 	}
 
 	// Ignore messages in non-enabled channels
 	{
-		channel, err := c.Discord.State.Channel(message.ChannelID)
+		channel, err := c.Discord.State.Channel(c.message.ChannelID)
 		if err != nil {
-			log.Error().Err(err).Msg("ignoring message - failed to retrieve channel info")
+			c.Log.Error().Err(err).Msg("ignoring message - failed to retrieve channel info")
 			return true
 		}
 
 		if !slices.Contains(c.Config.Categories.CommandsEnabled, channel.ParentID) {
-			log.Trace().
+			c.Log.Trace().
 				Str("category", channel.ParentID).
-				Str("channel", message.ChannelID).
+				Str("channel", c.message.ChannelID).
 				Msg("ignoring message in non-enabled category")
 			return true
 		}
@@ -183,33 +198,33 @@ func (c *CommandHandler) shouldIgnoreMessage(message *discordgo.Message, log zer
 
 	// Ignore messages from non-admin users
 	{
-		user, err := c.Discord.State.Member(message.GuildID, message.Author.ID)
+		user, err := c.Discord.State.Member(c.message.GuildID, c.message.Author.ID)
 		if err != nil {
-			log.Error().Err(err).Msg("ignoring message - failed to retrieve member info")
+			c.Log.Error().Err(err).Msg("ignoring message - failed to retrieve member info")
 			return true
 		}
 
 		if !slices.ContainsFunc(c.Config.Roles.Admin, func(adminRole string) bool {
 			return slices.Contains(user.Roles, adminRole)
 		}) {
-			log.Debug().Str("user", message.Author.Username).Msg("ignoring message from non-admin user")
+			c.Log.Debug().Str("user", c.message.Author.Username).Msg("ignoring message from non-admin user")
 			return true
 		}
 
 	}
 
 	// Ignore messages without bot prefix
-	if !strings.HasPrefix(strings.TrimSpace(message.Content), c.Config.Prefix) {
-		log.Debug().Msg("ignoring message without bot prefix")
+	if !strings.HasPrefix(strings.TrimSpace(c.message.Content), c.Config.Prefix) {
+		c.Log.Debug().Msg("ignoring message without bot prefix")
 		return true
 	}
 
 	return false
 }
 
-func (c *CommandHandler) parseCommand(message *discordgo.Message) (*CommandDetails, error) {
+func (c commandInvoker) parseCommand() (*CommandDetails, error) {
 	// Strip prefix from message (it must be present because of the above check to ignore messages without it)
-	messageContent := strings.TrimSpace(message.Content)[len(c.Config.Prefix):]
+	messageContent := strings.TrimSpace(c.message.Content)[len(c.Config.Prefix):]
 
 	// Parse command name and args out of the message
 	commandName, rawArgs, ok := strings.Cut(messageContent, " ")
@@ -236,9 +251,25 @@ func (c *CommandHandler) parseCommand(message *discordgo.Message) (*CommandDetai
 	}, nil
 }
 
+func (c commandInvoker) setUser(command *CommandDetails) error {
+	// first, parse user from explicit mention
+	user, err := c.getUserMention(command, c.message.GuildID)
+
+	if err == nil {
+		// If found, update args and user
+		command.Args = command.Args[1:]
+		command.User = user
+
+		return nil
+	}
+
+	// otherwise, try checking if it's a reply thread
+	return errors.New("no user found")
+}
+
 var userPingRegexp = regexp.MustCompile(`<@(\d+)>`)
 
-func (c *CommandHandler) getUserMention(command *CommandDetails, guildId string, log zerolog.Logger) (*discordgo.User, error) {
+func (c commandInvoker) getUserMention(command *CommandDetails, guildId string) (*discordgo.User, error) {
 	if len(command.Args) == 0 {
 		return nil, fmt.Errorf("this command requires a user, see %shelp", c.Utils.Config.Prefix)
 	}
@@ -261,7 +292,7 @@ func (c *CommandHandler) getUserMention(command *CommandDetails, guildId string,
 		return user, nil
 	}
 
-	log.Debug().
+	c.Log.Debug().
 		Str("input", userRef).
 		Str("errId", errId.Error()).
 		Str("errName", errName.Error()).
@@ -269,18 +300,4 @@ func (c *CommandHandler) getUserMention(command *CommandDetails, guildId string,
 
 	// otherwise return an error
 	return nil, fmt.Errorf("couldn't find a user with id or name `%s`", command.Args[0])
-}
-
-// createCommandUtils creates a utils struct for a command. This is the same as the handler's utils, except the
-// loggers are configured with extra command information.
-func (c *CommandHandler) createCommandUtils(log zerolog.Logger, command string) *lib.Utils {
-	log = log.With().
-		Str("command", command).
-		Logger()
-
-	utils := *c.Utils
-	utils.Log = log
-	utils.DB = database.WithLogger(utils.DB, log)
-
-	return &utils
 }

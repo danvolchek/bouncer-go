@@ -2,7 +2,7 @@ package lib
 
 import (
 	"github.com/bwmarrin/discordgo"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 	"os"
 	"os/signal"
@@ -28,13 +28,13 @@ type Component interface {
 }
 
 // NewBot creates a new discord bot.
-func NewBot(components []Component, config *Config, db *gorm.DB) *Bot {
+func NewBot(components []Component, config *Config, db *gorm.DB, log zerolog.Logger) *Bot {
 	return &Bot{
 		components: components,
 
 		Utils: &Utils{
 			Config: config,
-			Log:    log.Logger,
+			Log:    log,
 			DB:     db,
 		},
 	}

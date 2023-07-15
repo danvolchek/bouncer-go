@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/bwmarrin/discordgo v0.27.1
 	github.com/google/uuid v1.3.0
+	github.com/hashicorp/golang-lru/v2 v2.0.4
 	github.com/rs/zerolog v1.29.1
 	go.uber.org/mock v0.2.0
 	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df

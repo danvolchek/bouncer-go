@@ -9,7 +9,7 @@ type Ready struct {
 	*lib.Utils
 }
 
-func NewReadyLogger() *Ready {
+func NewReady() *Ready {
 	return &Ready{}
 }
 
