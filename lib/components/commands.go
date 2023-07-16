@@ -1,7 +1,6 @@
 package components
 
 import (
-	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/danvolchek/bouncer-go/lib"
@@ -91,6 +90,7 @@ func (c *Commands) Setup(utils *lib.Utils) {
 	c.Utils = utils
 
 	for name, command := range c.commands {
+		c.Log.Debug().Str("command", name).Msg("Registering command")
 		command.Setup(c.NewWithLog(lib.AddString("command", name)))
 	}
 
@@ -103,23 +103,32 @@ func (c *Commands) handleCommand(_ *discordgo.Session, messageCreate *discordgo.
 	uuid := uuid2.New().String()
 
 	invoker := commandInvoker{
-		uuid:    uuid,
-		message: messageCreate.Message,
-		Utils:   c.Utils.NewWithLog(lib.AddString("uuid", uuid)),
+		uuid:     uuid,
+		message:  messageCreate.Message,
+		commands: c.commands,
+		Utils:    c.Utils.NewWithLog(lib.AddString("uuid", uuid)),
 	}
 
 	invoker.invoke()
 }
 
+// commandInvoker invokes a command once.
 type commandInvoker struct {
-	uuid     string
-	message  *discordgo.Message
+	// uuid to trace execution of this command
+	uuid string
+
+	// message including the command name + args
+	message *discordgo.Message
+
+	// commands to lookup implementation from
 	commands map[string]Command
+
+	// general utilities
 	*lib.Utils
 }
 
+// invoke invokes the command
 func (c commandInvoker) invoke() {
-	// Check if this message should be ignored or not - is the user an admin, in the right channel, etc
 	if c.shouldIgnoreMessage() {
 		return
 	}
@@ -137,6 +146,7 @@ func (c commandInvoker) invoke() {
 
 	command, ok := c.commands[commandDetails.Name]
 	if !ok {
+		c.Log.Debug().Str("name", commandDetails.Name).Msg("no command exists with this name")
 		c.Reply(c.message, fmt.Sprintf("Unknown command `%s` - see `%shelp`", commandDetails.Name, c.Config.Prefix))
 		return
 	}
@@ -144,8 +154,11 @@ func (c commandInvoker) invoke() {
 	c.Utils = c.NewWithLog(lib.AddString("command", commandDetails.ShortString()))
 
 	if command.RequiresUser() {
-		err := c.setUser(commandDetails)
-		if err != nil {
+		ok := c.setUser(commandDetails)
+		if !ok {
+			c.Log.Warn().Msg("user not found, but one is required")
+			c.Reply(c.message, fmt.Sprintf("This command requires a valid user - see `%shelp`", c.Config.Prefix))
+			return
 		}
 	}
 
@@ -163,8 +176,9 @@ func (c commandInvoker) invoke() {
 	}
 }
 
+// sendUUID sends a discord message with the invoker's uuid
 func (c commandInvoker) sendUUID(wasError bool) {
-	if wasError {
+	if !wasError {
 		c.Reply(c.message, fmt.Sprintf("UUID for logs is `%s`.", c.uuid))
 	} else {
 		c.Reply(c.message, fmt.Sprintf("Oops, something went wrong handling that message. Check the logs for `%s`.", c.uuid))
@@ -222,6 +236,7 @@ func (c commandInvoker) shouldIgnoreMessage() bool {
 	return false
 }
 
+// parseCommand parses the raw message text into a command
 func (c commandInvoker) parseCommand() (*CommandDetails, error) {
 	// Strip prefix from message (it must be present because of the above check to ignore messages without it)
 	messageContent := strings.TrimSpace(c.message.Content)[len(c.Config.Prefix):]
@@ -251,27 +266,32 @@ func (c commandInvoker) parseCommand() (*CommandDetails, error) {
 	}, nil
 }
 
-func (c commandInvoker) setUser(command *CommandDetails) error {
-	// first, parse user from explicit mention
-	user, err := c.getUserMention(command, c.message.GuildID)
+// setUser updates command details with a user, returning whether it was successful
+func (c commandInvoker) setUser(command *CommandDetails) bool {
+	// First, parse user from command arguments
+	user := c.getUserFromArg(command, c.message.GuildID)
 
-	if err == nil {
+	if user != nil {
 		// If found, update args and user
 		command.Args = command.Args[1:]
 		command.User = user
 
-		return nil
+		return true
 	}
 
-	// otherwise, try checking if it's a reply thread
-	return errors.New("no user found")
+	// TODO: otherwise, try checking if it's a reply thread
+	return false
 }
 
 var userPingRegexp = regexp.MustCompile(`<@(\d+)>`)
 
-func (c commandInvoker) getUserMention(command *CommandDetails, guildId string) (*discordgo.User, error) {
+// getUserFromArg returns a user from command arguments
+func (c commandInvoker) getUserFromArg(command *CommandDetails, guildId string) *discordgo.User {
 	if len(command.Args) == 0 {
-		return nil, fmt.Errorf("this command requires a user, see %shelp", c.Utils.Config.Prefix)
+		c.Log.Debug().
+			Msg("command has no args to get user mention from")
+
+		return nil
 	}
 
 	userRef := command.Args[0]
@@ -283,21 +303,19 @@ func (c commandInvoker) getUserMention(command *CommandDetails, guildId string) 
 	// first try getting the user from their id directly, or a mention
 	user, errId := c.UserFromId(userRef)
 	if errId == nil {
-		return user, nil
+		return user
 	}
 
 	// next try getting the user from a name
 	user, errName := c.UserFromName(userRef, guildId)
 	if errName == nil {
-		return user, nil
+		return user
 	}
 
-	c.Log.Debug().
-		Str("input", userRef).
-		Str("errId", errId.Error()).
-		Str("errName", errName.Error()).
-		Msg("couldn't find user")
+	c.Log.Debug().Str("ref", userRef).Err(errId).Msg("cmd arg isn't a valid user id")
 
-	// otherwise return an error
-	return nil, fmt.Errorf("couldn't find a user with id or name `%s`", command.Args[0])
+	c.Log.Debug().Str("ref", userRef).Err(errName).Msg("cmd arg isn't a valid user name")
+
+	// otherwise there's no user
+	return nil
 }
