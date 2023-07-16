@@ -1,5 +1,21 @@
 # Features
 
+<!-- TOC -->
+* [Direct message forwarding](#direct-message-forwarding)
+* [User note logging](#user-note-logging)
+* [User watching](#user-watching)
+* [Spam prevention](#spam-prevention)
+* [Event tracking](#event-tracking)
+* [User reports](#user-reports)
+* [Backups](#backups)
+* [Misc](#misc)
+  * [Thread improvements](#thread-improvements)
+  * [Uptime tracking](#uptime-tracking)
+  * [Help](#help)
+  * [Speak as bouncer in the server](#speak-as-bouncer-in-the-server)
+  * [Sync bot commands](#sync-bot-commands)
+<!-- TOC -->
+
 ## Direct message forwarding
 
 *Description*
